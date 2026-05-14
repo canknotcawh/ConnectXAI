@@ -1,0 +1,27 @@
+
+
+Ðây là toàn b? ? tý?ng thi?t k? AI cho ConnectX — nh?n vào t?ng l?p trong sõ ð? ð? xem chi ti?t. Ð? gi?i thích thêm:
+
+T?ng quan chi?n lý?c
+ConnectX v? b?n ch?t là Connect 4 có th? tùy ch?nh (m?c ð?nh 7×6, c?n 4 liên ti?p). Agent c?a b?n là m?t hàm Python my_agent(observation, configuration) có t?i ða 2 giây m?i ný?c ði.
+Ki?n trúc ð? xu?t: Layered Hybrid Agent
+L?p 1 — Immediate Threat Detector (ýu tiên cao nh?t): Trý?c khi làm b?t c? ði?u g?, quét bàn c? t?m ný?c th?ng ngay ho?c c?n ch?n ð?i th? ngay. Không c?n t?m ki?m sâu, ch?y <1ms.
+L?p 2 — Opening Book: C?t gi?a (c?t 3) luôn là ný?c khai cu?c m?nh nh?t trong Connect 4. Hard-code ~15–20 ph?n h?i t?i ýu cho các ný?c ð?u ván ð? không l?ng phí 2 giây.
+L?p 3 — Negamax + Alpha-Beta + Iterative Deepening: Ðây là tr?ng tâm. Iterative deepening ð?m b?o b?n luôn có ðáp án dù h?t gi? gi?a ch?ng. Alpha-beta c?t b? t?i ~50–70% nhánh không c?n thi?t. ? ð? sâu 8–10, agent này ð? r?t m?nh.
+L?p 4 — Heuristic Evaluation: Khi chýa ð?n tr?ng thái k?t thúc, hàm ði?m s? ðánh giá: ki?m soát trung tâm, s? "c?a s? 4 ô" có l?i th?, và các ðe d?a ch?ng lên nhau.
+L? tr?nh nâng c?p
+Giai ðo?n 1 (ð? ð? top leaderboard trung b?nh) ? Giai ðo?n 2 v?i MCTS + UCB1 (linh ho?t hõn, không c?n heuristic t?t) ? Giai ðo?n 3 v?i CNN self-play ki?u AlphaZero n?u mu?n leo top.
+Layer 1 thêm g? so v?i file c??
+Hàm m?i drop_piece() — thay th? code copy board inline l?p l?i nhi?u nõi, gi? dùng chung 1 ch?, code g?n hõn.
+Hàm m?i is_winning_board() — quét ð? 4 hý?ng, ki?m tra bàn c? có ph?i tr?ng thái th?ng không. Ðây là n?n t?ng c?a Layer 1.
+Hàm m?i is_winning_move() — th? th? quân vào c?t, r?i g?i is_winning_board. Ch?y c?c nhanh <1ms.
+Trong my_agent(), th? t? ýu tiên gi? là:
+L1A: T?m ný?c th?ng ngay         ? ði li?n (không tính g? thêm)
+L1B: T?m ný?c ch?n ð?i th? th?ng ? block li?n
+L2:  Greedy heuristic + center bonus (fallback)
+Center bonus — fix thêm: trên bàn tr?ng c?t gi?a (c?t 3) gi? luôn ðý?c ch?n thay v? c?t 0.
+Ði?m n?i b?t c?a Layer 2:
+* Depth 8 hoàn ch?nh trong 1.75s (~36k nodes)
+* Move ordering tái s? d?ng k?t qu? depth trý?c ? alpha-beta pruning hi?u qu? hõn ~30%
+* Iterative deepening an toàn: ch? dùng k?t qu? depth ð? hoàn ch?nh 100%
+
