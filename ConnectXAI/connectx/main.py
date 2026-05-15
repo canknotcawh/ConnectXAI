@@ -30,6 +30,13 @@ class _Timeout(Exception):
     """Ném khi hết thời gian tìm kiếm."""
     pass
 
+# ══════════════════════════════════════════════════════════════
+# BẢNG BĂM (TRANSPOSITION TABLE)
+# ══════════════════════════════════════════════════════════════
+_tt = {}          # Dictionary lưu trữ: {board_tuple: (score, depth, flag)}
+EXACT = 0         # Điểm chính xác
+LOWERBOUND = 1    # Điểm cắt Beta (score >= beta)
+UPPERBOUND = 2    # Điểm cắt Alpha (score <= alpha)
 
 # ══════════════════════════════════════════════════════════════
 # PHẦN 1 — CÔNG CỤ DÙNG CHUNG
@@ -157,52 +164,63 @@ def move_order(valid_moves, config):
 
 
 def negamax(board, depth, alpha, beta, mark, config):
-    """
-    Negamax + Alpha-Beta pruning với deadline timeout.
-
-    ┌─ Khi đạt depth=0: trả về heuristic (leaf node)
-    ├─ Khi thắng: trả về WIN_SCORE + depth (thắng sớm = điểm cao hơn)
-    ├─ Khi hòa: trả về 0
-    └─ Khi hết giờ: ném _Timeout (được catch ở find_best_move)
-
-    Alpha-Beta:
-      alpha = điểm tốt nhất mà MAX đảm bảo được
-      beta  = điểm tốt nhất mà MIN đảm bảo được
-      Khi alpha >= beta → đối thủ sẽ không cho phép nhánh này → cắt
-    """
-    global _node_count
-
-    # Kiểm tra deadline mỗi N_CHECK node (tránh gọi time.time() liên tục)
+    global _node_count, _tt
+    
+    # 1. Kiểm tra deadline
     _node_count += 1
     if _node_count % N_CHECK == 0 and time.time() >= _deadline:
         raise _Timeout()
 
-    opp         = 3 - mark
+    # 2. TRA CỨU BẢNG BĂM (TT Lookup)
+    board_key = tuple(board)
+    entry = _tt.get(board_key)
+    if entry is not None:
+        stored_score, stored_depth, flag = entry
+        if stored_depth >= depth:
+            if flag == EXACT:
+                return stored_score
+            elif flag == LOWERBOUND:
+                alpha = max(alpha, stored_score)
+            elif flag == UPPERBOUND:
+                beta = min(beta, stored_score)
+            
+            if alpha >= beta:
+                return stored_score
+
+    # 3. Các điều kiện dừng (Terminal states)
+    opp = 3 - mark
     valid_moves = [c for c in range(config.columns) if board[c] == 0]
+    if not valid_moves: return 0
+    if depth == 0: return heuristic_board(board, mark, config)
 
-    # Terminal states
-    if not valid_moves:
-        return 0                                  # Hòa (bàn đầy)
-
-    if depth == 0:
-        return heuristic_board(board, mark, config)  # Leaf: dùng heuristic
+    # 4. Tìm kiếm
+    original_alpha = alpha
+    best_score = -(WIN_SCORE + 1000)
 
     for col in move_order(valid_moves, config):
         nb = drop_piece(board, col, mark, config)
-
-        # Fast path: nước này thắng ngay → không cần đệ quy thêm
         if is_winning_board(nb, mark, config):
-            return WIN_SCORE + depth              # Thắng sớm = điểm cao hơn
+            score = WIN_SCORE + depth
+        else:
+            score = -negamax(nb, depth - 1, -beta, -alpha, opp, config)
 
-        # Đệ quy: đối thủ đi, negate điểm (zero-sum)
-        score = -negamax(nb, depth - 1, -beta, -alpha, opp, config)
-
-        if score > alpha:
-            alpha = score
+        if score > best_score:
+            best_score = score
+        alpha = max(alpha, score)
         if alpha >= beta:
-            break                                 # Beta cutoff → pruning
+            break
 
-    return alpha
+    # 5. LƯU TRỮ VÀO BẢNG BĂM (TT Store)
+    if best_score <= original_alpha:
+        flag = UPPERBOUND
+    elif best_score >= beta:
+        flag = LOWERBOUND
+    else:
+        flag = EXACT
+    
+    _tt[board_key] = (best_score, depth, flag)
+
+    return best_score
 
 
 def find_best_move(board, mark, config):
